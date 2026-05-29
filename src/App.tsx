@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Play, Folder, Clock, ChevronRight, LayoutGrid, List, Menu, X, PlayCircle, Download, FileText, ChevronLeft, Maximize, FastForward, SkipBack, SkipForward, Volume2 } from 'lucide-react';
+import { Search, Play, Folder, Clock, ChevronRight, LayoutGrid, List, Menu, X, PlayCircle, Download, FileText, ChevronLeft, Maximize, FastForward, SkipBack, SkipForward, Volume2, Settings, HardDrive, RefreshCw, LogOut } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { VideoFile, Topic } from './types';
+import { VideoFile, Topic, FolderInfo, AppConfig } from './types';
 
 // Components
-const Navbar = ({ onSearch, onToggleSidebar }: { onSearch: (q: string) => void, onToggleSidebar: () => void }) => (
+const Navbar = ({ onSearch, onToggleSidebar, onOpenSettings, currentPath }: { onSearch: (q: string) => void, onToggleSidebar: () => void, onOpenSettings: () => void, currentPath?: string | null }) => (
   <nav className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-md border-b border-white/10 flex items-center justify-between px-6 z-50">
     <div className="flex items-center gap-4">
       <button onClick={onToggleSidebar} className="p-2 hover:bg-white/10 rounded-full lg:hidden">
@@ -16,6 +16,14 @@ const Navbar = ({ onSearch, onToggleSidebar }: { onSearch: (q: string) => void, 
         </div>
         <h1 className="text-xl font-bold text-white tracking-tight hidden sm:block">Telegram Library</h1>
       </div>
+      {currentPath && (
+         <div className="hidden md:flex items-center gap-2 ml-4 px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <HardDrive size={14} className="text-blue-500" />
+            <span className="text-[10px] font-bold text-white/60 truncate max-w-[200px]">
+              {currentPath.split('/').pop()}
+            </span>
+         </div>
+      )}
     </div>
     <div className="flex-1 max-w-2xl px-4">
       <div className="relative group">
@@ -28,10 +36,175 @@ const Navbar = ({ onSearch, onToggleSidebar }: { onSearch: (q: string) => void, 
         />
       </div>
     </div>
-    <div className="w-48 hidden sm:flex justify-end pr-2">
-       <span className="text-xs text-white/40 uppercase tracking-widest font-semibold">Premium Player</span>
+    <div className="flex items-center gap-3">
+       <button 
+        onClick={onOpenSettings}
+        className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 text-white transition-all hover:scale-105 active:scale-95"
+       >
+          <Settings size={20} />
+       </button>
     </div>
   </nav>
+);
+
+const FolderCard: React.FC<{ folder: FolderInfo; onSelect: () => void; isSelected?: boolean }> = ({ folder, onSelect, isSelected }) => (
+  <motion.div 
+    whileHover={{ y: -4 }}
+    onClick={onSelect}
+    className={`p-6 cursor-pointer rounded-3xl border transition-all ${isSelected ? 'bg-blue-600/10 border-blue-600 shadow-2xl shadow-blue-500/10' : 'bg-white/5 border-white/10 hover:border-white/20 hover:bg-white/10'}`}
+  >
+    <div className="flex items-start justify-between mb-4">
+      <div className={`p-4 rounded-2xl ${isSelected ? 'bg-blue-600 text-white' : 'bg-white/5 text-white/40'}`}>
+        <Folder size={32} />
+      </div>
+      <div className="text-right">
+        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest block">Modified</span>
+        <span className="text-xs text-white/60 font-medium">{new Date(folder.mtime).toLocaleDateString()}</span>
+      </div>
+    </div>
+    <h3 className="text-lg font-bold text-white mb-2 truncate">{folder.name}</h3>
+    <div className="flex items-center gap-4">
+      <div className="flex flex-col">
+        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Files</span>
+        <span className="text-sm text-white/80 font-mono">{folder.fileCount}</span>
+      </div>
+      <div className="w-px h-6 bg-white/10" />
+      <div className="flex flex-col">
+        <span className="text-[10px] font-bold text-white/30 uppercase tracking-widest">Size</span>
+        <span className="text-sm text-white/80 font-mono">{(folder.totalSize / (1024 * 1024)).toFixed(1)} MB</span>
+      </div>
+    </div>
+  </motion.div>
+);
+
+const FolderSelection = ({ folders, onSelect, onRescan, loading }: { folders: FolderInfo[], onSelect: (f: FolderInfo) => void, onRescan: () => void, loading: boolean }) => {
+  const [q, setQ] = useState('');
+  const filtered = folders.filter(f => f.name.toLowerCase().includes(q.toLowerCase()));
+
+  return (
+    <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 selection:bg-blue-600/30 selection:text-blue-400">
+      <div className="max-w-5xl w-full">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <span className="text-blue-500 font-bold uppercase tracking-[0.3em] text-xs mb-3 block">Media Library</span>
+            <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter">Source Selection</h1>
+            <p className="text-white/40 mt-3 text-lg">Choose a media batch to begin library scanning.</p>
+          </div>
+          <button 
+            onClick={onRescan}
+            disabled={loading}
+            className="flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 rounded-2xl text-white font-bold transition-all hover:scale-105 active:scale-95 shadow-xl"
+          >
+            <RefreshCw size={20} className={loading ? 'animate-spin' : ''} />
+            Scan Directory
+          </button>
+        </div>
+
+        <div className="relative mb-8">
+           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20" size={20} />
+           <input 
+            type="text" 
+            placeholder="Search batches..."
+            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-lg shadow-inner"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+           />
+        </div>
+
+        {loading && folders.length === 0 ? (
+          <div className="py-24 text-center">
+            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+            <p className="text-white/40 font-mono uppercase tracking-[0.2em] text-xs">Scanning filesystem...</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="py-24 text-center bg-white/5 rounded-[3rem] border border-white/5 border-dashed">
+            <Search size={48} className="mx-auto text-white/5 mb-4" />
+            <p className="text-white/20 text-xl font-medium italic">No batches found matching "{q}"</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filtered.map(f => (
+              <FolderCard key={f.path} folder={f} onSelect={() => onSelect(f)} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+const SettingsView = ({ currentRoot, onClose, onRescan, onChangeSource }: { currentRoot: string | null, onClose: () => void, onRescan: () => void, onChangeSource: () => void }) => (
+  <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 sm:p-12">
+     <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="absolute inset-0 bg-black/80 backdrop-blur-xl"
+     />
+     <motion.div 
+      initial={{ opacity: 0, scale: 0.95, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.95, y: 20 }}
+      className="relative w-full max-w-xl bg-neutral-900 rounded-[2.5rem] border border-white/10 shadow-2xl overflow-hidden"
+     >
+        <div className="p-8 pb-4 flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-white">Library Settings</h2>
+          <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-full text-white/40 hover:text-white transition-colors">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="p-8 pt-0 space-y-6">
+           <div className="p-6 bg-white/5 rounded-3xl border border-white/10">
+              <span className="text-[10px] font-bold text-white/30 uppercase tracking-[0.2em] mb-3 block">Currently Active Source</span>
+              <div className="flex items-center gap-3">
+                 <div className="p-3 bg-blue-600 rounded-2xl text-white">
+                    <Folder size={24} />
+                 </div>
+                 <div className="flex-1 overflow-hidden">
+                    <p className="text-white font-bold truncate text-lg">{currentRoot ? currentRoot.split('/').pop() : 'Not Set'}</p>
+                    <p className="text-white/30 text-xs truncate font-mono">{currentRoot || '---'}</p>
+                 </div>
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 gap-4">
+              <button 
+                onClick={onRescan}
+                className="flex items-center justify-between p-5 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                   <RefreshCw className="text-blue-500 group-hover:rotate-180 transition-transform duration-500" />
+                   <div className="text-left">
+                      <p className="text-white font-bold">Refresh Media Cache</p>
+                      <p className="text-white/40 text-xs">Re-scan the current folder for new changes</p>
+                   </div>
+                </div>
+                <ChevronRight className="text-white/20" />
+              </button>
+
+              <button 
+                onClick={onChangeSource}
+                className="flex items-center justify-between p-5 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                   <LogOut className="text-red-500" />
+                   <div className="text-left">
+                      <p className="text-white font-bold">Change Media Source</p>
+                      <p className="text-white/40 text-xs">Switch to a different video batch folder</p>
+                   </div>
+                </div>
+                <ChevronRight className="text-white/20" />
+              </button>
+           </div>
+        </div>
+
+        <div className="p-8 bg-black/40 border-t border-white/5 flex items-center justify-center">
+           <p className="text-white/20 text-xs font-bold uppercase tracking-widest">Library Version 2.0.4 - Production-Ready</p>
+        </div>
+     </motion.div>
+  </div>
 );
 
 const Sidebar = ({ topics, activeTopic, onSelectTopic, isOpen, onClose }: { topics: Topic[], activeTopic: string | null, onSelectTopic: (name: string | null) => void, isOpen: boolean, onClose: () => void }) => (
@@ -61,14 +234,16 @@ const Sidebar = ({ topics, activeTopic, onSelectTopic, isOpen, onClose }: { topi
         
         <div className="space-y-1">
           <h3 className="px-4 text-xs font-bold text-white/30 uppercase tracking-widest mb-2">Categories</h3>
-          {topics.map((t) => (
+          {topics.length === 0 ? (
+             <p className="px-4 text-[10px] text-white/20 italic">No topics found</p>
+          ) : topics.map((t) => (
             <button 
               key={t.name}
               onClick={() => { onSelectTopic(t.name); onClose(); }}
               className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all group ${activeTopic === t.name ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'}`}
             >
-              <div className="flex items-center gap-3">
-                <Folder size={18} className={activeTopic === t.name ? 'text-blue-500' : ''} />
+              <div className="flex items-center gap-3 overflow-hidden">
+                <Folder size={18} className={activeTopic === t.name ? 'text-blue-500' : 'text-white/30'} />
                 <span className="truncate text-sm font-medium">{t.name}</span>
               </div>
               <span className="text-[10px] font-mono bg-white/5 py-0.5 px-2 rounded-full group-hover:bg-white/10">{t.count}</span>
@@ -165,9 +340,9 @@ const VideoPlayerPage = ({ video, onBack, onNext, onPrev, relatedPdfs }: { video
         </div>
 
         <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-6">
-          <div className="flex-1">
-            <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight">{video.name}</h1>
-            <div className="flex items-center gap-4 mt-4">
+          <div className="flex-1 overflow-hidden">
+            <h1 className="text-2xl md:text-3xl font-bold text-white leading-tight break-words">{video.name}</h1>
+            <div className="flex flex-wrap items-center gap-4 mt-4">
                <div className="flex items-center gap-2 px-4 py-2 bg-white/5 rounded-full border border-white/10">
                   <Folder size={18} className="text-blue-500" />
                   <span className="text-sm font-medium text-white/80">{video.topic}</span>
@@ -231,19 +406,48 @@ const VideoPlayerPage = ({ video, onBack, onNext, onPrev, relatedPdfs }: { video
 };
 
 export default function App() {
+  const [config, setConfig] = useState<AppConfig | null>(null);
+  const [folders, setFolders] = useState<FolderInfo[]>([]);
   const [videos, setVideos] = useState<VideoFile[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [loading, setLoading] = useState(true);
+  const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
-    fetchData();
-    const interval = setInterval(fetchData, 300000); // 5 mins
-    return () => clearInterval(interval);
+    initApp();
   }, []);
+
+  const initApp = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/config');
+      const cfg = await res.json();
+      setConfig(cfg);
+      
+      if (cfg.mediaRoot) {
+        await fetchData();
+      } else {
+        await fetchFolders();
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchFolders = async () => {
+    setScanning(true);
+    try {
+      const res = await fetch('/api/folders');
+      setFolders(await res.json());
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -253,8 +457,37 @@ export default function App() {
       ]);
       setVideos(await vRes.json());
       setTopics(await tRes.json());
+    } catch (err) {
+      console.error('Failed to load media', err);
+    }
+  };
+
+  const handleSelectFolder = async (folder: FolderInfo) => {
+    setScanning(true);
+    try {
+      const res = await fetch('/api/select-folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder: folder.name })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setConfig({ mediaRoot: data.mediaRoot });
+        await fetchData();
+      }
     } finally {
-      setLoading(false);
+      setScanning(false);
+    }
+  };
+
+  const handleRescanCache = async () => {
+    setScanning(true);
+    try {
+      await fetch('/api/rescan', { method: 'POST' });
+      await fetchData();
+      setIsSettingsOpen(false);
+    } finally {
+      setScanning(false);
     }
   };
 
@@ -286,15 +519,31 @@ export default function App() {
       <div className="min-h-screen bg-black flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-white/40 font-mono text-sm tracking-widest uppercase animate-pulse">Initializing Library...</p>
+          <p className="text-white/40 font-mono text-sm tracking-widest uppercase animate-pulse">Loading Platform...</p>
         </div>
       </div>
     );
   }
 
+  if (!config?.mediaRoot) {
+    return (
+      <FolderSelection 
+        folders={folders} 
+        onSelect={handleSelectFolder} 
+        onRescan={fetchFolders} 
+        loading={scanning} 
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-black text-white selection:bg-blue-600/30 selection:text-blue-400">
-      <Navbar onSearch={setSearchTerm} onToggleSidebar={() => setIsSidebarOpen(true)} />
+      <Navbar 
+        onSearch={setSearchTerm} 
+        onToggleSidebar={() => setIsSidebarOpen(true)} 
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        currentPath={config.mediaRoot}
+      />
       
       <Sidebar 
         topics={topics} 
@@ -305,18 +554,24 @@ export default function App() {
       />
 
       <main className={`pt-24 lg:pl-64 px-6 pb-12 transition-all`}>
-        {/* Recent & Hero Section (only on "All Topics" and if no search) */}
+        {/* Recent Section */}
         {!activeTopic && !searchTerm && (
           <section className="mb-12">
             <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
               <Clock size={24} className="text-blue-500" />
-              Recently Added
+              Recent Media
             </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              {recentVideos.map(v => (
-                <VideoCard key={v.id} video={v} onClick={() => setSelectedVideo(v)} />
-              ))}
-            </div>
+            {recentVideos.length === 0 ? (
+               <div className="p-8 bg-white/5 border border-dashed border-white/10 rounded-3xl text-center">
+                  <p className="text-white/20">No videos found yet in this directory.</p>
+               </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {recentVideos.map(v => (
+                  <VideoCard key={v.id} video={v} onClick={() => setSelectedVideo(v)} />
+                ))}
+              </div>
+            )}
           </section>
         )}
 
@@ -324,17 +579,17 @@ export default function App() {
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-2xl font-bold text-white flex items-center gap-3">
               <Folder size={24} className="text-blue-500" />
-              {activeTopic || (searchTerm ? `Search: ${searchTerm}` : 'Explore Library')}
+              {activeTopic || (searchTerm ? `Results: ${searchTerm}` : 'Full Library')}
             </h2>
-            <span className="text-xs font-mono text-white/30 uppercase tracking-widest">
-              {currentVideos.length} items found
+            <span className="text-xs font-mono text-white/30 uppercase tracking-widest bg-white/5 px-3 py-1 rounded-full border border-white/10">
+              {currentVideos.length} items
             </span>
           </div>
 
           {currentVideos.length === 0 ? (
-            <div className="py-24 text-center bg-white/5 rounded-3xl border border-white/5">
-              <Search size={48} className="mx-auto text-white/10 mb-4" />
-              <p className="text-white/40">No videos found matching your criteria</p>
+            <div className="py-24 text-center bg-white/5 rounded-[2.5rem] border border-white/5">
+              <Search size={48} className="mx-auto text-white/5 mb-4" />
+              <p className="text-white/40">No media matches your filter/search</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-6">
@@ -358,8 +613,23 @@ export default function App() {
         )}
       </AnimatePresence>
 
+      <AnimatePresence>
+        {isSettingsOpen && (
+          <SettingsView 
+            currentRoot={config.mediaRoot}
+            onClose={() => setIsSettingsOpen(false)}
+            onRescan={handleRescanCache}
+            onChangeSource={() => {
+              setConfig({ mediaRoot: null });
+              setIsSettingsOpen(false);
+              fetchFolders();
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       <footer className="lg:pl-64 py-12 px-6 border-t border-white/5 text-center">
-        <p className="text-white/20 text-sm font-medium tracking-tight">RPSC Record Plus Live Archive &copy; 2026</p>
+        <p className="text-white/10 text-xs font-bold uppercase tracking-widest">Archive Management System &copy; 2026</p>
       </footer>
     </div>
   );

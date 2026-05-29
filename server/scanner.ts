@@ -6,6 +6,41 @@ import crypto from 'crypto';
 
 const cache = new NodeCache({ stdTTL: 300 }); // 5 minutes cache
 
+export function clearCache() {
+  cache.flushAll();
+}
+
+export async function listFolders(parentPath: string): Promise<any[]> {
+  if (!fs.existsSync(parentPath)) return [];
+  
+  const folders = fs.readdirSync(parentPath, { withFileTypes: true })
+    .filter(dirent => dirent.isDirectory())
+    .map(dirent => dirent.name);
+
+  const results = [];
+  for (const folder of folders) {
+    const fullPath = path.join(parentPath, folder);
+    const stats = fs.statSync(fullPath);
+    
+    const files = await fg(['**/*.{mp4,mkv,avi,pdf}'], {
+      cwd: fullPath,
+      stats: true,
+    });
+
+    const totalSize = files.reduce((acc, f) => acc + (f.stats?.size || 0), 0);
+
+    results.push({
+      name: folder,
+      path: folder,
+      fileCount: files.length,
+      totalSize,
+      mtime: stats.mtime.getTime(),
+    });
+  }
+  
+  return results.sort((a, b) => b.mtime - a.mtime);
+}
+
 export interface VideoFile {
   id: string;
   name: string;
@@ -28,7 +63,8 @@ export function generateId(filePath: string): string {
 }
 
 export async function scanFiles(basePath: string): Promise<VideoFile[]> {
-  const cached = cache.get<VideoFile[]>('videos');
+  const cacheKey = `videos_${basePath}`;
+  const cached = cache.get<VideoFile[]>(cacheKey);
   if (cached) return cached;
 
   // Use a fallback path if the target doesn't exist (for dev)
@@ -94,7 +130,7 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
   // Sort by mtime descending (recent first)
   files.sort((a, b) => b.mtime - a.mtime);
 
-  cache.set('videos', files);
+  cache.set(cacheKey, files);
   return files;
 }
 

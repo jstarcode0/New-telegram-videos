@@ -14,3 +14,15 @@ export interface Topic {
   count: number;
   videos: VideoFile[];
 }
+
+export interface FolderInfo {
+  name: string;
+  path: string;
+  fileCount: number;
+  totalSize: number;
+  mtime: number;
+}
+
+export interface AppConfig {
+  mediaRoot: string | null;
+}
