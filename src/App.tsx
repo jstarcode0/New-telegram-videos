@@ -214,8 +214,8 @@ const VideoCard: React.FC<{ video: VideoFile; onClick: () => void; highlight: st
          )}
       </div>
     </div>
-    <div className="p-6">
-      <h4 className="text-white font-bold text-sm line-clamp-2 leading-relaxed min-h-[2.8rem] group-hover:text-blue-400 transition-colors">
+    <div className="p-4 md:p-6 min-w-0">
+      <h4 className="text-white font-bold text-xs md:text-sm line-clamp-2 leading-relaxed min-h-[2.4rem] md:min-h-[2.8rem] group-hover:text-blue-400 transition-colors break-words overflow-hidden">
         <HighlightingText text={video.name} highlight={highlight} />
       </h4>
       <div className="flex items-center justify-between mt-4 border-t border-white/5 pt-4">
@@ -248,8 +248,6 @@ const VideoPlayerPage = ({
   const [networkStats, setNetworkStats] = useState({ speed: '0 B/s', progress: 0 });
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const startTime = useRef(Date.now());
-  const bytesLoaded = useRef(0);
 
   useEffect(() => {
     const saved = localStorage.getItem(`continue_${video.id}`);
@@ -261,7 +259,6 @@ const VideoPlayerPage = ({
       if (videoRef.current && !videoRef.current.paused) {
         localStorage.setItem(`continue_${video.id}`, videoRef.current.currentTime.toString());
         
-        // Simulating/Calculating bandwidth
         const buffered = videoRef.current.buffered;
         if (buffered.length > 0) {
            const prog = (buffered.end(buffered.length - 1) / videoRef.current.duration) * 100;
@@ -298,142 +295,147 @@ const VideoPlayerPage = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#050505] z-[100] overflow-y-auto selection:bg-blue-600/30 font-sans">
-      <div className="max-w-6xl mx-auto px-4 py-12">
-        <div className="flex items-center justify-between mb-8 overflow-hidden">
-          <button onClick={onBack} className="flex items-center gap-3 text-white/40 hover:text-white transition-all group px-4 py-2 bg-white/5 rounded-2xl border border-white/5">
-            <ChevronLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
-            <span className="text-xs font-black uppercase tracking-widest">Library</span>
+    <div className="fixed inset-0 bg-[#050505] z-[100] overflow-y-auto overflow-x-hidden selection:bg-blue-600/30 font-sans">
+      <div className="w-full max-w-7xl mx-auto px-4 py-8 lg:py-12">
+        <div className="flex items-center justify-between mb-6 md:mb-8 overflow-hidden gap-4">
+          <button onClick={onBack} className="flex items-center gap-3 text-white/40 hover:text-white transition-all group px-4 py-2 bg-white/5 rounded-2xl border border-white/5 shrink-0">
+            <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Library</span>
           </button>
           
-          <div className="flex items-center gap-4 text-white/20">
-             <div className="flex flex-col items-end">
-                <span className="text-[10px] font-black uppercase tracking-widest mb-1">Network</span>
+          <div className="flex items-center gap-4 text-white/20 min-w-0">
+             <div className="hidden sm:flex flex-col items-end">
+                <span className="text-[10px] font-black uppercase tracking-widest mb-0.5">Network</span>
                 <div className="flex items-center gap-2">
-                   <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
-                   <span className="text-[10px] font-mono text-white/60 tracking-tighter">HD Stream Relay</span>
+                   <div className="w-1 h-1 rounded-full bg-green-500" />
+                   <span className="text-[9px] font-mono text-white/60 tracking-tighter">HD Stream Active</span>
                 </div>
              </div>
           </div>
         </div>
 
-        <div ref={containerRef} className="relative aspect-video bg-black rounded-[2.5rem] overflow-hidden border border-white/5 shadow-[0_0_100px_rgba(0,0,0,1)] ring-1 ring-white/10 group/player mb-10">
+        <div 
+          ref={containerRef} 
+          className="relative w-full aspect-video bg-black rounded-2xl md:rounded-[2.5rem] overflow-hidden border border-white/10 shadow-2xl ring-1 ring-white/5 group/player mb-8 md:mb-10 max-h-[50vh] md:max-h-[70vh] lg:max-h-[75vh]"
+        >
           <video 
             ref={videoRef}
             src={`/api/stream/${video.id}`} 
             controls 
             autoPlay 
-            className="w-full h-full"
+            playsInline
+            className="w-full h-full object-contain"
             style={{ playbackRate: playbackSpeed }}
             onEnded={onNext}
           />
           
-          {/* Custom Overlay Stats */}
-          <div className="absolute top-6 left-6 pointer-events-none opacity-0 group-hover/player:opacity-100 transition-opacity">
+          <div className="absolute top-4 left-4 md:top-6 md:left-6 pointer-events-none opacity-0 group-hover/player:opacity-100 transition-opacity">
              <div className="px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-xl border border-white/10 flex items-center gap-3">
-                <Activity size={14} className="text-blue-500" />
-                <span className="text-[10px] font-bold text-white uppercase tracking-tighter">Buffered: {networkStats.progress.toFixed(1)}%</span>
+                <Activity size={12} className="text-blue-500" />
+                <span className="text-[9px] font-bold text-white uppercase tracking-tighter">Live Buffered: {networkStats.progress.toFixed(1)}%</span>
              </div>
           </div>
 
-          <div className="absolute bottom-20 right-8 flex flex-col gap-3 opacity-0 group-hover/player:opacity-100 transition-all translate-y-4 group-hover/player:translate-y-0">
-             <button onClick={togglePiP} className="p-3 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 text-white hover:bg-white/20 transition-all">
-                <Monitor size={20} />
+          <div className="absolute bottom-20 right-4 md:right-8 flex flex-col gap-3 opacity-0 group-hover/player:opacity-100 transition-all translate-y-4 group-hover/player:translate-y-0">
+             <button onClick={togglePiP} className="p-2.5 md:p-3 bg-white/10 backdrop-blur-xl rounded-full border border-white/10 text-white hover:bg-white/20 transition-all">
+                <Monitor size={18} />
              </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-           <div className="lg:col-span-2 space-y-8">
-              <div>
-                 <div className="flex items-center gap-3 mb-4">
-                    <span className="px-3 py-1 bg-blue-600/10 text-blue-500 rounded-full text-[10px] font-black uppercase tracking-widest border border-blue-500/20">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 w-full overflow-hidden">
+           <div className="lg:col-span-2 space-y-6 md:space-y-8 min-w-0">
+              <div className="min-w-0 overflow-hidden">
+                 <div className="flex items-center gap-3 mb-3 md:mb-4">
+                    <span className="px-2.5 py-0.5 bg-blue-600/10 text-blue-500 rounded-full text-[9px] font-black uppercase tracking-widest border border-blue-500/20">
                       Now Screening
                     </span>
-                    <span className="text-white/20 font-black tracking-widest text-[10px] uppercase">{video.ext.replace('.', '')} Archive</span>
+                    <span className="text-white/20 font-black tracking-widest text-[9px] uppercase truncate">{video.ext.replace('.', '')} Batch</span>
                  </div>
-                 <h1 className="text-3xl md:text-5xl font-black text-white leading-none tracking-tighter mb-6">{video.name}</h1>
-                 <div className="flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/10">
-                       <Folder size={18} className="text-blue-500" />
-                       <span className="text-sm font-bold text-white/80">{video.topic}</span>
+                 <h1 className="text-2xl md:text-3xl lg:text-5xl font-black text-white leading-tight tracking-tighter mb-4 md:mb-6 break-words whitespace-normal">
+                   {video.name}
+                 </h1>
+                 <div className="flex flex-wrap items-center gap-2 md:gap-4 overflow-hidden">
+                    <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-2.5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                       <Folder size={16} className="text-blue-500 shrink-0" />
+                       <span className="text-xs md:text-sm font-bold text-white/80 truncate">{video.topic}</span>
                     </div>
-                    <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/10">
-                       <Clock size={18} className="text-white/40" />
-                       <span className="text-sm font-bold text-white/80">{new Date(video.mtime).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-2.5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                       <Clock size={16} className="text-white/40 shrink-0" />
+                       <span className="text-xs md:text-sm font-bold text-white/80 shrink-0">{new Date(video.mtime).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex items-center gap-3 px-5 py-2.5 bg-white/5 rounded-2xl border border-white/10">
-                       <HardDrive size={18} className="text-white/40" />
-                       <span className="text-sm font-bold text-white/80">{(video.size / (1024 * 1024)).toFixed(1)} MB</span>
+                    <div className="flex items-center gap-2 md:gap-3 px-3 md:px-5 py-2 md:py-2.5 bg-white/5 rounded-xl md:rounded-2xl border border-white/10">
+                       <HardDrive size={16} className="text-white/40 shrink-0" />
+                       <span className="text-xs md:text-sm font-bold text-white/80 shrink-0">{(video.size / (1024 * 1024)).toFixed(1)} MB</span>
                     </div>
                  </div>
               </div>
 
-              <div className="p-8 bg-white/2 rounded-[2rem] border border-white/5 space-y-4">
-                 <h3 className="text-sm font-black uppercase tracking-widest text-white/20">System Shortcuts</h3>
+              <div className="p-6 md:p-8 bg-white/2 rounded-2xl md:rounded-[2rem] border border-white/5 space-y-4 overflow-hidden">
+                 <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-white/20">Control Interface</h3>
                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                     {[
-                      { k: 'Space', l: 'Play/Pause', i: <Play size={14}/> },
-                      { k: 'F', l: 'Fullscreen', i: <Maximize size={14}/> },
-                      { k: '→ / ←', l: 'Seek 5s', i: <Activity size={14}/> },
-                      { k: 'Esc', l: 'Close', i: <LogOut size={14}/> },
+                      { k: 'Space', l: 'Play/Pause', i: <Play size={12}/> },
+                      { k: 'F', l: 'Fullscreen', i: <Maximize size={12}/> },
+                      { k: '→ / ←', l: 'Seek 5s', i: <Activity size={12}/> },
+                      { k: 'Esc', l: 'Close', i: <LogOut size={12}/> },
                     ].map(s => (
-                      <div key={s.l} className="flex flex-col gap-1 items-start">
+                      <div key={s.l} className="flex flex-col gap-1 items-start overflow-hidden">
                          <div className="flex items-center gap-2 text-white/40">
                             {s.i}
-                            <span className="text-[10px] font-black uppercase tracking-widest">{s.l}</span>
+                            <span className="text-[9px] font-black uppercase tracking-widest truncate">{s.l}</span>
                          </div>
-                         <kbd className="px-2 py-1 bg-white/10 rounded-lg text-[10px] font-mono text-white/60 border-b-2 border-black/60">{s.k}</kbd>
+                         <kbd className="px-1.5 py-0.5 bg-white/10 rounded-md text-[9px] font-mono text-white/60 border-b border-black/60">{s.k}</kbd>
                       </div>
                     ))}
                  </div>
               </div>
            </div>
 
-           <div className="space-y-8">
+           <div className="space-y-6 md:space-y-8 min-w-0">
               <div className="flex flex-col gap-4">
-                 <h3 className="text-xs font-black text-white/20 uppercase tracking-[0.3em]">Playback Matrix</h3>
-                 <div className="grid grid-cols-5 bg-white/5 p-1.5 rounded-2xl border border-white/10">
+                 <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] px-1">Relay Cadence</h3>
+                 <div className="grid grid-cols-5 bg-white/5 p-1 rounded-xl md:rounded-2xl border border-white/10 overflow-hidden">
                     {[0.5, 1, 1.25, 1.5, 2].map(s => (
                       <button 
                         key={s} 
                         onClick={() => setPlaybackSpeed(s)}
-                        className={`py-3 rounded-xl text-xs font-black transition-all ${playbackSpeed === s ? 'bg-blue-600 text-white shadow-lg' : 'text-white/20 hover:text-white hover:bg-white/5'}`}
+                        className={`py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black transition-all ${playbackSpeed === s ? 'bg-blue-600 text-white shadow-lg' : 'text-white/20 hover:text-white hover:bg-white/5'}`}
                       >
                         {s}x
                       </button>
                     ))}
                  </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <button onClick={onPrev} className="flex items-center justify-center gap-3 p-5 bg-white/5 hover:bg-white/10 rounded-3xl border border-white/10 text-white transition-all hover:scale-105 active:scale-95 shadow-xl">
-                       <SkipBack size={24} />
+                 <div className="grid grid-cols-2 gap-3 md:gap-4">
+                    <button onClick={onPrev} className="flex items-center justify-center gap-3 p-4 md:p-5 bg-white/5 hover:bg-white/10 rounded-2xl md:rounded-3xl border border-white/10 text-white transition-all hover:scale-[1.02] active:scale-95 shadow-xl">
+                       <SkipBack size={20} />
                     </button>
-                    <button onClick={onNext} className="flex items-center justify-center gap-3 p-5 bg-white/5 hover:bg-white/10 rounded-3xl border border-white/10 text-white transition-all hover:scale-105 active:scale-95 shadow-xl">
-                       <SkipForward size={24} />
+                    <button onClick={onNext} className="flex items-center justify-center gap-3 p-4 md:p-5 bg-white/5 hover:bg-white/10 rounded-2xl md:rounded-3xl border border-white/10 text-white transition-all hover:scale-[1.02] active:scale-95 shadow-xl">
+                       <SkipForward size={20} />
                     </button>
                  </div>
               </div>
 
               {relatedPdfs.length > 0 && (
-                <div className="space-y-6">
-                  <h3 className="text-xs font-black text-white/20 uppercase tracking-[0.3em] flex items-center gap-2">
-                    <FileText size={16} className="text-red-500/60" />
+                <div className="space-y-4 md:space-y-6 min-w-0 overflow-hidden">
+                  <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em] flex items-center gap-2 px-1">
+                    <FileText size={14} className="text-red-500/60" />
                     Archive Logistics
                   </h3>
                   <div className="space-y-3">
                     {relatedPdfs.map(pdf => (
-                      <div key={pdf.id} className="flex items-center justify-between p-5 bg-[#0f0f0f] rounded-3xl border border-white/5 group hover:border-white/20 hover:bg-white/5 transition-all">
-                        <div className="flex items-center gap-4 overflow-hidden">
-                          <div className="p-3 bg-red-500/10 text-red-500 rounded-2xl">
-                            <FileText size={22} />
+                      <div key={pdf.id} className="flex items-center justify-between p-4 md:p-5 bg-[#0f0f0f] rounded-2xl md:rounded-3xl border border-white/5 group hover:border-white/20 hover:bg-white/5 transition-all overflow-hidden gap-3">
+                        <div className="flex items-center gap-3 md:gap-4 overflow-hidden min-w-0 flex-1">
+                          <div className="p-2.5 md:p-3 bg-red-500/10 text-red-500 rounded-xl md:rounded-2xl shrink-0">
+                            <FileText size={18} md:size={22} />
                           </div>
-                          <div className="flex flex-col overflow-hidden">
-                             <span className="text-sm font-bold text-white/80 truncate group-hover:text-white">{pdf.name}</span>
-                             <span className="text-[10px] font-bold text-white/20 uppercase tracking-widest">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
+                          <div className="flex flex-col overflow-hidden min-w-0">
+                             <span className="text-xs md:text-sm font-bold text-white/80 truncate group-hover:text-white">{pdf.name}</span>
+                             <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest shrink-0">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
                           </div>
                         </div>
-                        <a href={`/api/pdf/${pdf.id}`} target="_blank" className="p-3 bg-white/5 hover:bg-blue-600 rounded-2xl text-white/40 hover:text-white transition-all">
-                          <Download size={20} />
+                        <a href={`/api/pdf/${pdf.id}`} target="_blank" className="p-2.5 md:p-3 bg-white/5 hover:bg-blue-600 rounded-xl md:rounded-2xl text-white/40 hover:text-white transition-all shrink-0">
+                          <Download size={18} />
                         </a>
                       </div>
                     ))}
@@ -757,21 +759,21 @@ export default function App() {
         onClose={() => setIsSidebarOpen(false)} 
       />
 
-      <main className={`pt-24 lg:pl-72 px-8 pb-32 transition-all`}>
+      <main className="pt-24 lg:pl-72 w-full max-w-full overflow-x-hidden px-4 md:px-8 pb-32 transition-all">
         {/* Statistics Banner */}
         {!activeTopic && !searchTerm && (
-           <section className="mb-16 grid grid-cols-1 md:grid-cols-4 gap-6">
+           <section className="mb-16 grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 md:gap-6">
               {[
                 { l: 'Archives', v: videos.filter(v=>v.type==='video').length, i: <PlayCircle size={18} className="text-blue-500"/> },
                 { l: 'Dataset Logs', v: videos.filter(v=>v.type==='pdf').length, i: <FileText size={18} className="text-red-500"/> },
                 { l: 'Index Size', v: `${(videos.reduce((a,v)=>a+v.size,0)/(1024*1024*1024)).toFixed(1)} GB`, i: <HardDrive size={18} className="text-white/20"/> },
                 { l: 'Network State', v: 'Optimized', i: <Activity size={18} className="text-emerald-500"/> },
               ].map(s => (
-                <div key={s.l} className="p-6 bg-[#0f0f0f] rounded-[2rem] border border-white/5 flex items-center gap-4 group hover:border-white/20 transition-all">
-                   <div className="p-3 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform">{s.i}</div>
-                   <div>
-                      <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">{s.l}</p>
-                      <p className="text-lg font-black text-white">{s.v}</p>
+                <div key={s.l} className="p-4 md:p-6 bg-[#0f0f0f] rounded-2xl md:rounded-[2rem] border border-white/5 flex items-center gap-4 group hover:border-white/20 transition-all overflow-hidden">
+                   <div className="p-3 bg-white/5 rounded-2xl group-hover:scale-110 transition-transform shrink-0">{s.i}</div>
+                   <div className="min-w-0">
+                      <p className="text-[10px] font-black text-white/20 uppercase tracking-widest truncate">{s.l}</p>
+                      <p className="text-base md:text-lg font-black text-white truncate">{s.v}</p>
                    </div>
                 </div>
               ))}
@@ -864,14 +866,14 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <footer className="lg:pl-72 py-20 px-10 border-t border-white/5 text-center flex flex-col items-center gap-6">
+      <footer className="lg:pl-72 w-full max-w-full overflow-x-hidden py-12 md:py-20 px-4 md:px-10 border-t border-white/5 text-center flex flex-col items-center gap-6">
         <div className="w-12 h-1 bg-blue-600 rounded-full opacity-20" />
-        <div className="flex items-center gap-6 text-white/10 font-black uppercase tracking-[0.4em] text-[10px]">
+        <div className="flex flex-wrap justify-center items-center gap-4 md:gap-6 text-white/10 font-black uppercase tracking-[0.2em] md:tracking-[0.4em] text-[8px] md:text-[10px]">
            <span>Secured Archive</span>
-           <span className="w-1 h-1 rounded-full bg-white/10" />
+           <span className="w-1 h-1 rounded-full bg-white/10 hidden md:block" />
            <span>High Performance Indexing</span>
-           <span className="w-1 h-1 rounded-full bg-white/10" />
-           <span>2026 Ready</span>
+           <span className="w-1 h-1 rounded-full bg-white/10 hidden md:block" />
+           <span>Cloud Node 2026</span>
         </div>
       </footer>
     </div>
