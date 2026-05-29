@@ -1,0 +1,6 @@
+{
+  "name": "Telegram Video Library",
+  "description": "A high-performance video library for managing and streaming downloaded telegram videos with topic grouping, search, and thumbnail support.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
