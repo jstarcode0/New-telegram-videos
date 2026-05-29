@@ -15,6 +15,7 @@ const VIDEO_PATH = process.env.VIDEO_STORAGE_PATH || './videos';
 const THUMB_PATH = path.resolve(process.env.THUMBNAIL_PATH || './thumbnails');
 
 async function startServer() {
+  console.log(`[Storage] Storage Path: ${VIDEO_PATH}`);
   // Ensure paths exist
   if (!fs.existsSync(VIDEO_PATH)) fs.mkdirSync(VIDEO_PATH, { recursive: true });
   if (!fs.existsSync(THUMB_PATH)) fs.mkdirSync(THUMB_PATH, { recursive: true });

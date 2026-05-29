@@ -37,6 +37,8 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
     fs.mkdirSync(resolvedPath, { recursive: true });
   }
 
+  console.log(`[Scanner] Starting recursive scan in: ${resolvedPath}`);
+
   const entries = await fg(['**/*.{mp4,mkv,avi,pdf}'], {
     cwd: resolvedPath,
     stats: true,
@@ -46,19 +48,27 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
   const files: VideoFile[] = entries.map((entry) => {
     const fileName = path.basename(entry.path);
     const ext = path.extname(entry.path).toLowerCase();
+    const relativePath = path.relative(resolvedPath, entry.path);
+    const pathParts = relativePath.split(path.sep);
     
-    // Simple topic extraction: words before first number or special char
-    // or just assume the first word if it looks like a category
-    // User example: "Grammar - Tenses 01" -> Topic: Grammar
-    // We'll try to extract the first part before a hyphen or space-separated chunk
-    let topic = 'Uncategorized';
-    if (fileName.includes(' - ')) {
-       topic = fileName.split(' - ')[0].trim();
+    // Topic Detection:
+    // 1. Use the immediate parent folder name if it's not the root
+    // 2. Otherwise extract from filename
+    let topic = 'General';
+    
+    if (pathParts.length > 1) {
+       // Root/FolderA/File.mp4 -> FolderA
+       // Root/FolderA/SubFolder/File.mp4 -> SubFolder
+       topic = pathParts[pathParts.length - 2];
     } else {
-       // Fallback: use first word
-       const firstWord = fileName.split(/[ \d]/)[0];
-       if (firstWord && firstWord.length > 2) {
-         topic = firstWord;
+       // Try extracting from name like before
+       if (fileName.includes(' - ')) {
+         topic = fileName.split(' - ')[0].trim();
+       } else {
+         const firstWord = fileName.split(/[ \d]/)[0];
+         if (firstWord && firstWord.length > 2) {
+           topic = firstWord;
+         }
        }
     }
 
@@ -73,6 +83,13 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
       mtime: entry.stats?.mtime.getTime() || Date.now(),
     };
   });
+
+  const videoCount = files.filter(f => f.type === 'video').length;
+  const pdfCount = files.filter(f => f.type === 'pdf').length;
+
+  console.log(`[Scanner] Found ${videoCount} videos`);
+  console.log(`[Scanner] Found ${pdfCount} PDFs`);
+  console.log(`[Scanner] Scan complete. Total items: ${files.length}`);
 
   // Sort by mtime descending (recent first)
   files.sort((a, b) => b.mtime - a.mtime);
