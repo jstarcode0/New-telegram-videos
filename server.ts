@@ -135,8 +135,9 @@ async function startServer() {
         return res.status(404).send('Not found');
       }
       
+      console.log(`[Thumbnails] Generating/Fetching: ${video.name}`);
       const thumbPath = await getThumbnail(id, video.path);
-      res.sendFile(thumbPath); // Use absolute path safely
+      res.sendFile(thumbPath);
     } catch (err) {
       res.status(404).send('Not found');
     }
@@ -144,9 +145,9 @@ async function startServer() {
 
   // Streaming Route
   app.get('/api/stream/:id', async (req, res) => {
-    const path = getResolvedVideoPath();
+    const p = getResolvedVideoPath();
     const { id } = req.params;
-    const videos = await scanFiles(path);
+    const videos = await scanFiles(p);
     const video = videos.find(v => v.id === id);
 
     if (!video) return res.status(404).send('Video not found');
@@ -155,6 +156,8 @@ async function startServer() {
     const stat = fs.statSync(filePath);
     const fileSize = stat.size;
     const range = req.headers.range;
+
+    console.log(`[Streaming] Serving: ${video.name} | Range: ${range || 'Full'}`);
 
     if (range) {
       const parts = range.replace(/bytes=/, "").split("-");
@@ -167,6 +170,7 @@ async function startServer() {
         'Accept-Ranges': 'bytes',
         'Content-Length': chunksize,
         'Content-Type': mime.lookup(video.ext) || 'video/mp4',
+        'Cache-Control': 'no-cache',
       };
       res.writeHead(206, head);
       file.pipe(res);
@@ -174,6 +178,7 @@ async function startServer() {
       const head = {
         'Content-Length': fileSize,
         'Content-Type': mime.lookup(video.ext) || 'video/mp4',
+        'Accept-Ranges': 'bytes',
       };
       res.writeHead(200, head);
       fs.createReadStream(filePath).pipe(res);

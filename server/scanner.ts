@@ -20,6 +20,7 @@ export async function listFolders(parentPath: string): Promise<any[]> {
   const results = [];
   for (const folder of folders) {
     const fullPath = path.join(parentPath, folder);
+    if (!fs.existsSync(fullPath)) continue;
     const stats = fs.statSync(fullPath);
     
     const files = await fg(['**/*.{mp4,mkv,avi,pdf}'], {
@@ -27,12 +28,15 @@ export async function listFolders(parentPath: string): Promise<any[]> {
       stats: true,
     });
 
+    const videoCount = files.filter(f => !f.path.endsWith('.pdf')).length;
+    const pdfCount = files.filter(f => f.path.endsWith('.pdf')).length;
     const totalSize = files.reduce((acc, f) => acc + (f.stats?.size || 0), 0);
 
     results.push({
       name: folder,
       path: folder,
-      fileCount: files.length,
+      videoCount,
+      pdfCount,
       totalSize,
       mtime: stats.mtime.getTime(),
     });
@@ -83,34 +87,50 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
 
   const files: VideoFile[] = entries.map((entry) => {
     const fileName = path.basename(entry.path);
+    const fileNameNoExt = fileName.replace(/\.[^/.]+$/, "");
     const ext = path.extname(entry.path).toLowerCase();
     const relativePath = path.relative(resolvedPath, entry.path);
     const pathParts = relativePath.split(path.sep);
     
     // Topic Detection:
-    // 1. Use the immediate parent folder name if it's not the root
+    // 1. If deep in folders, use the immediate parent
     // 2. Otherwise extract from filename
     let topic = 'General';
     
     if (pathParts.length > 1) {
-       // Root/FolderA/File.mp4 -> FolderA
-       // Root/FolderA/SubFolder/File.mp4 -> SubFolder
        topic = pathParts[pathParts.length - 2];
     } else {
-       // Try extracting from name like before
+       // Clean filename topic extraction
+       // "01517 - Determiners-01.mp4" -> split by '-'
        if (fileName.includes(' - ')) {
          topic = fileName.split(' - ')[0].trim();
+       } else if (fileName.includes('-')) {
+         topic = fileName.split('-')[0].trim();
        } else {
-         const firstWord = fileName.split(/[ \d]/)[0];
-         if (firstWord && firstWord.length > 2) {
-           topic = firstWord;
-         }
+         topic = fileName.split(/[ \d]/)[0] || 'General';
        }
     }
 
+    // Clean Topic: Remove leading numbers like 01668
+    topic = topic.replace(/^\d+[\s\-_]*/, '').trim();
+    if (!topic || /^\d+$/.test(topic)) {
+       topic = 'General';
+    }
+
+    // Special mapping based on keywords if topic is too generic
+    if (topic.toLowerCase() === 'general' || topic.length < 3) {
+      if (fileName.toLowerCase().includes('grammar')) topic = 'Grammar';
+      else if (fileName.toLowerCase().includes('phonetic')) topic = 'Phonetics';
+      else if (fileName.toLowerCase().includes('literary')) topic = 'Literary Forms';
+      else if (fileName.toLowerCase().includes('mmc')) topic = 'MMC';
+    }
+
+    // Capitalize properly
+    topic = topic.charAt(0).toUpperCase() + topic.slice(1);
+
     return {
       id: generateId(entry.path),
-      name: fileName,
+      name: fileNameNoExt,
       path: entry.path,
       ext,
       topic,

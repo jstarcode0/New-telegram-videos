@@ -27,7 +27,8 @@ export async function getThumbnail(videoId: string, videoPath: string): Promise<
         count: 1,
         folder: THUMB_DIR,
         filename: `${videoId}.jpg`,
-        size: '320x180',
+        size: '640x360',
+        timestamps: ['00:00:05'],
       });
   });
 }

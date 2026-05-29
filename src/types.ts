@@ -18,7 +18,8 @@ export interface Topic {
 export interface FolderInfo {
   name: string;
   path: string;
-  fileCount: number;
+  videoCount: number;
+  pdfCount: number;
   totalSize: number;
   mtime: number;
 }
