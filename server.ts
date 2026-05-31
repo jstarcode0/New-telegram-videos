@@ -13,8 +13,8 @@ dotenv.config();
 const app = express();
 app.use(express.json()); // Essential for POST requests
 const PORT = 3000;
-const DOWNLOADS_ROOT = '/root/telegram_downloads';
-const THUMB_PATH = path.resolve(process.env.THUMBNAIL_PATH || './thumbnails');
+const DOWNLOADS_ROOT = path.join(process.cwd(), 'telegram_downloads');
+const THUMB_PATH = path.resolve(process.env.THUMBNAIL_PATH || path.join(process.cwd(), 'thumbnails'));
 
 function getResolvedVideoPath() {
   const config = getConfig();

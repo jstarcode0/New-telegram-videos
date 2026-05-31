@@ -235,32 +235,21 @@ const VideoCard: React.FC<{ video: VideoFile; onClick: () => void; highlight: st
 const VideoPlayerPage = ({ 
   video, 
   allVideos,
-  mode,
   onBack, 
-  onClose,
-  onRestore,
   onNext, 
-  onPrev, 
-  relatedPdfs 
+  onPrev 
 }: { 
   video: VideoFile, 
   allVideos: VideoFile[],
-  mode: 'full' | 'mini',
   onBack: () => void, 
-  onClose: () => void,
-  onRestore: () => void,
   onNext?: () => void, 
-  onPrev?: () => void, 
-  relatedPdfs: VideoFile[] 
+  onPrev?: () => void
 }) => {
   const [playbackSpeed, setPlaybackSpeed] = useState(() => parseFloat(localStorage.getItem('pref_speed') || '1'));
   const [volume, setVolume] = useState(() => parseFloat(localStorage.getItem('pref_volume') || '1'));
   const [isLiked, setIsLiked] = useState(false);
   const [networkStats, setNetworkStats] = useState({ progress: 0 });
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [duration, setDuration] = useState(0);
-
+  
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -270,14 +259,12 @@ const VideoPlayerPage = ({
 
     // Load saved position
     const savedPos = localStorage.getItem(`continue_${video.id}`);
-    if (savedPos && !player.currentTime) player.currentTime = parseFloat(savedPos);
+    if (savedPos) player.currentTime = parseFloat(savedPos);
     
     player.volume = volume;
     player.playbackRate = playbackSpeed;
 
     const onTimeUpdate = () => {
-      setCurrentTime(player.currentTime);
-      setDuration(player.duration);
       localStorage.setItem(`continue_${video.id}`, player.currentTime.toString());
       if (player.buffered.length > 0) {
         const prog = (player.buffered.end(player.buffered.length - 1) / player.duration) * 100;
@@ -292,31 +279,14 @@ const VideoPlayerPage = ({
       }
     };
 
-    const onPlay = () => setIsPlaying(true);
-    const onPause = () => setIsPlaying(false);
-
     player.addEventListener('timeupdate', onTimeUpdate);
     player.addEventListener('volumechange', onVolumeChange);
-    player.addEventListener('play', onPlay);
-    player.addEventListener('pause', onPause);
 
     return () => {
-      // Don't kill player on mode change, only on component unmount (closing video)
       player.removeEventListener('timeupdate', onTimeUpdate);
       player.removeEventListener('volumechange', onVolumeChange);
-      player.removeEventListener('play', onPlay);
-      player.removeEventListener('pause', onPause);
     };
   }, [video.id]);
-
-  useEffect(() => {
-    // If we transition to mini, make sure we don't accidentally pause if it was playing, 
-    // or keep it playing as per requirement.
-    if (mode === 'mini' && videoRef.current) {
-       // Requirement: "Do NOT pause the video. Continue playback."
-       // It should already be playing if it was.
-    }
-  }, [mode]);
 
   useEffect(() => {
     return () => {
@@ -349,9 +319,42 @@ const VideoPlayerPage = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
-  const upNext = useMemo(() => {
-    return allVideos.filter(v => v.type === 'video' && v.id !== video.id).slice(0, 10);
-  }, [allVideos, video.id]);
+  const relatedVideos = useMemo(() => {
+    return allVideos
+      .filter(v => v.type === 'video' && v.id !== video.id)
+      .map(v => {
+        let score = 0;
+        if (v.topic === video.topic) score += 10;
+        
+        const p1 = video.name.split(/[-_\s]/)[0].toLowerCase();
+        const p2 = v.name.split(/[-_\s]/)[0].toLowerCase();
+        if (p1 === p2 && p1.length > 2) score += 5;
+        
+        return { video: v, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.video)
+      .slice(0, 15);
+  }, [allVideos, video.id, video.name, video.topic]);
+
+  const relatedPdfs = useMemo(() => {
+    return allVideos
+      .filter(v => v.type === 'pdf')
+      .map(p => {
+        let score = 0;
+        if (p.topic === video.topic) score += 10;
+        
+        const vWords = video.name.toLowerCase().split(/[-_\s]/).filter(w => w.length > 2);
+        const pWords = p.name.toLowerCase().split(/[-_\s]/).filter(w => w.length > 2);
+        const common = vWords.filter(w => pWords.includes(w));
+        score += common.length * 5;
+
+        return { pdf: p, score };
+      })
+      .filter(x => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map(x => x.pdf);
+  }, [allVideos, video.name, video.topic]);
 
   const handleShare = () => {
     navigator.share?.({ title: video.name, url: window.location.href }).catch(() => {
@@ -361,139 +364,108 @@ const VideoPlayerPage = ({
 
   return (
     <motion.div 
-      initial={mode === 'full' ? { opacity: 0 } : { scale: 0, opacity: 0 }}
-      animate={mode === 'full' 
-        ? { opacity: 1, x: 0, y: 0, width: '100%', height: '100%' } 
-        : { scale: 1, opacity: 1 }
-      }
-      exit={{ opacity: 0, scale: 0.5 }}
-      style={{
-        borderRadius: mode === 'full' ? 0 : '1rem',
-      }}
-      className={mode === 'full' 
-        ? "fixed inset-0 bg-[#050505] z-[100] overflow-y-auto overflow-x-hidden selection:bg-blue-600/30 font-sans"
-        : "fixed bottom-6 right-6 w-[320px] md:w-[400px] bg-[#0f0f0f] z-[200] border border-white/10 shadow-2xl overflow-hidden group/mini shadow-black/80 cursor-move"
-      }
-      drag={mode === 'mini'}
-      dragConstraints={{ top: -1000, left: -1000, right: 0, bottom: 0 }}
-      onDoubleClick={() => mode === 'mini' && onRestore()}
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-[#050505] z-[100] overflow-y-auto overflow-x-hidden selection:bg-blue-600/30 font-sans"
     >
-      {mode === 'full' ? (
-        <div className="w-full max-w-[1600px] mx-auto px-4 py-4 lg:py-8">
-          <div className="flex items-center gap-4 mb-6">
-            <button onClick={onBack} className="flex items-center gap-2 text-white/40 hover:text-white transition-all group px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 shrink-0">
-              <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Library</span>
-            </button>
-            <div className="h-px bg-white/5 flex-1" />
-          </div>
+      <div className="w-full max-w-[1600px] mx-auto px-4 py-4 lg:py-8">
+        <div className="flex items-center gap-4 mb-6">
+          <button onClick={onBack} className="flex items-center gap-2 text-white/40 hover:text-white transition-all group px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 shrink-0">
+            <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-widest">Library</span>
+          </button>
+          <div className="h-px bg-white/5 flex-1" />
+        </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-8 space-y-6">
-              <div 
-                ref={containerRef} 
-                className="relative w-full aspect-video bg-black rounded-2xl md:rounded-3xl overflow-hidden border border-white/10 shadow-2xl ring-1 ring-white/10 group/player max-h-[75vh]"
-                onDoubleClick={() => containerRef.current?.requestFullscreen()}
-              >
-                <video 
-                  ref={videoRef}
-                  src={`/api/stream/${video.id}`} 
-                  controls 
-                  autoPlay 
-                  playsInline
-                  className="w-full h-full"
-                  style={{ playbackRate: playbackSpeed }}
-                  onEnded={onNext}
-                />
-                <div className="absolute top-4 left-4 pointer-events-none opacity-0 group-hover/player:opacity-100 transition-opacity">
-                  <div className="px-3 py-1 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
-                    <Activity size={12} className="text-blue-500" />
-                    <span className="text-[9px] font-bold text-white uppercase">Buffer: {networkStats.progress.toFixed(1)}%</span>
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 space-y-6">
+            <div 
+              ref={containerRef} 
+              className="relative w-full aspect-video bg-black rounded-2xl md:rounded-3xl overflow-hidden border border-white/10 shadow-2xl ring-1 ring-white/10 group/player"
+              onDoubleClick={() => containerRef.current?.requestFullscreen()}
+            >
+              <video 
+                ref={videoRef}
+                src={`/api/stream/${video.id}`} 
+                controls 
+                autoPlay 
+                playsInline
+                className="w-full h-full"
+                style={{ playbackRate: playbackSpeed }}
+                onEnded={onNext}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <h1 className="text-xl md:text-2xl font-black text-white leading-tight break-words">{video.name}</h1>
+              
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2 border-b border-white/5 pb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg">
+                    {video.topic.charAt(0)}
                   </div>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-white truncate max-w-[200px]">{video.topic}</span>
+                    <span className="text-[10px] text-white/40 uppercase font-black">Archive Batch</span>
+                  </div>
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <button 
+                    onClick={() => setIsLiked(!isLiked)}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${isLiked ? 'bg-blue-600 border-blue-600' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
+                  >
+                    <Activity size={16} className={isLiked ? 'text-white' : 'text-blue-500'} />
+                    <span className="text-xs font-bold">{isLiked ? 'Favorite' : 'Like'}</span>
+                  </button>
+                  <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 transition-all">
+                    <Monitor size={16} />
+                    <span className="text-xs font-bold">Share</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h1 className="text-xl md:text-2xl font-black text-white leading-tight break-words">{video.name}</h1>
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2 border-b border-white/5 pb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center font-bold text-white shadow-lg">
-                      {video.topic.charAt(0)}
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-white truncate max-w-[200px]">{video.topic}</span>
-                      <span className="text-[10px] text-white/40 uppercase font-black">Archive Batch</span>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button 
-                      onClick={() => setIsLiked(!isLiked)}
-                      className={`flex items-center gap-2 px-4 py-2 rounded-full border transition-all ${isLiked ? 'bg-blue-600 border-blue-600' : 'bg-white/5 border-white/10 hover:bg-white/10'}`}
-                    >
-                      <Activity size={16} className={isLiked ? 'text-white' : 'text-blue-500'} />
-                      <span className="text-xs font-bold">{isLiked ? 'Favorite' : 'Like'}</span>
-                    </button>
-                    <button onClick={handleShare} className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 rounded-full border border-white/10 transition-all">
-                      <Monitor size={16} />
-                      <span className="text-xs font-bold">Share</span>
-                    </button>
-                    <div className="h-8 w-px bg-white/10 mx-1" />
-                    <button 
-                      onClick={() => {
-                        if (document.pictureInPictureElement) {
-                          document.exitPictureInPicture();
-                        } else {
-                          videoRef.current?.requestPictureInPicture();
-                        }
-                      }}
-                      className="p-2.5 bg-white/5 hover:bg-white/10 rounded-full border border-white/10"
-                    >
-                      <Monitor size={18} />
-                    </button>
-                  </div>
+              {/* Description & metadata box */}
+              <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+                <div className="flex flex-wrap gap-x-8 gap-y-4 text-xs font-bold text-white/60">
+                   <div className="flex flex-col">
+                      <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Uploaded</span>
+                      <span>{new Date(video.mtime).toLocaleDateString()}</span>
+                   </div>
+                   <div className="flex flex-col">
+                      <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Payload</span>
+                      <span>{(video.size / (1024 * 1024)).toFixed(1)} MB</span>
+                   </div>
                 </div>
-
-                <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
-                  <div className="flex flex-wrap gap-x-8 gap-y-4 text-xs font-bold text-white/60">
-                     <div className="flex flex-col">
-                        <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Uploaded</span>
-                        <span>{new Date(video.mtime).toLocaleDateString()}</span>
-                     </div>
-                     <div className="flex flex-col">
-                        <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Payload</span>
-                        <span>{(video.size / (1024 * 1024)).toFixed(1)} MB</span>
-                     </div>
-                     <div className="flex flex-col">
-                        <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Format</span>
-                        <span className="uppercase">{video.ext.replace('.', '')} Archive</span>
-                     </div>
-                  </div>
-                  <div className="h-px bg-white/5" />
-                  <div className="flex items-center gap-4">
-                     <span className="text-[10px] font-black uppercase text-white/20">Playback Speed:</span>
-                     <div className="flex gap-1">
-                        {[0.5, 1, 1.25, 1.5, 2].map(speed => (
-                          <button 
-                            key={speed}
-                            onClick={() => {
-                              setPlaybackSpeed(speed);
-                              localStorage.setItem('pref_speed', speed.toString());
-                            }}
-                            className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${playbackSpeed === speed ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-white/20 hover:text-white'}`}
-                          >
-                            {speed}x
-                          </button>
-                        ))}
-                     </div>
-                  </div>
+                
+                <div className="h-px bg-white/5" />
+                
+                <div className="flex items-center gap-4">
+                   <span className="text-[10px] font-black uppercase text-white/20">Playback Speed:</span>
+                   <div className="flex gap-1">
+                      {[0.5, 1, 1.25, 1.5, 2].map(speed => (
+                        <button 
+                          key={speed}
+                          onClick={() => {
+                            setPlaybackSpeed(speed);
+                            localStorage.setItem('pref_speed', speed.toString());
+                          }}
+                          className={`px-3 py-1 rounded-lg text-[10px] font-black transition-all ${playbackSpeed === speed ? 'bg-blue-600 text-white shadow-lg' : 'bg-white/5 text-white/20 hover:text-white'}`}
+                        >
+                          {speed}x
+                        </button>
+                      ))}
+                   </div>
                 </div>
               </div>
 
+              {/* Related PDFs Section */}
               {relatedPdfs.length > 0 && (
                 <div className="pt-8">
                   <h3 className="text-sm font-black text-white/20 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
                     <FileText size={16} className="text-red-500" />
-                    Technical Documentation
+                    Related PDFs
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {relatedPdfs.map(pdf => (
@@ -507,124 +479,75 @@ const VideoPlayerPage = ({
                              <span className="text-[9px] text-white/20 font-black">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
                           </div>
                         </div>
-                        <a href={`/api/pdf/${pdf.id}`} target="_blank" className="p-2.5 bg-white/5 hover:bg-blue-600 rounded-xl text-white/40 hover:text-white transition-all">
-                          <Download size={16} />
-                        </a>
+                        <div className="flex items-center gap-2">
+                          <button 
+                            onClick={() => window.open(`/api/pdf/${pdf.id}`, '_blank')}
+                            className="p-2.5 bg-white/5 hover:bg-blue-600 rounded-xl text-white/40 hover:text-white transition-all"
+                            title="View"
+                          >
+                            <Monitor size={16} />
+                          </button>
+                          <a 
+                            href={`/api/pdf/${pdf.id}`} 
+                            download 
+                            className="p-2.5 bg-white/5 hover:bg-blue-600 rounded-xl text-white/40 hover:text-white transition-all"
+                            title="Download"
+                          >
+                            <Download size={16} />
+                          </a>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
             </div>
+          </div>
 
-            <div className="lg:col-span-4 space-y-6">
-               <div className="flex items-center justify-between px-2">
-                  <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Up Next</h3>
-                  <div className="flex gap-2">
-                     <button onClick={onPrev} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
-                        <SkipBack size={16} />
-                     </button>
-                     <button onClick={onNext} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
-                        <SkipForward size={16} />
-                     </button>
-                  </div>
-               </div>
+          <div className="lg:col-span-4 space-y-6">
+             <div className="flex items-center justify-between px-2">
+                <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Related Videos</h3>
+                <div className="flex gap-2">
+                   <button onClick={onPrev} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
+                      <SkipBack size={16} />
+                   </button>
+                   <button onClick={onNext} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
+                      <SkipForward size={16} />
+                   </button>
+                </div>
+             </div>
 
-               <div className="space-y-4">
-                  {upNext.map(v => (
-                    <div 
-                      key={v.id} 
-                      onClick={() => {
-                          const event = new CustomEvent('select-video', { detail: v });
-                          window.dispatchEvent(event);
-                      }}
-                      className="flex gap-3 p-2 rounded-2xl hover:bg-white/5 transition-all group cursor-pointer border border-transparent hover:border-white/5"
-                    >
-                      <div className="relative w-40 aspect-video rounded-xl overflow-hidden shrink-0 bg-black">
-                        <img 
-                          src={`/api/thumbnail/${v.id}`} 
-                          alt={v.name} 
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/320x180/111/fff?text=${encodeURIComponent(v.topic)}`}
-                        />
-                      </div>
-                      <div className="flex flex-col justify-center min-w-0 pr-2">
-                        <h4 className="text-xs font-bold text-white/90 line-clamp-2 leading-snug group-hover:text-blue-400 transition-colors mb-2">{v.name}</h4>
-                        <div className="flex flex-col gap-1">
-                          <span className="text-[9px] font-black text-blue-500/60 uppercase truncate">{v.topic}</span>
-                          <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
-                        </div>
+             <div className="space-y-4">
+                {relatedVideos.map(v => (
+                  <div 
+                    key={v.id} 
+                    onClick={() => {
+                        const event = new CustomEvent('select-video', { detail: v });
+                        window.dispatchEvent(event);
+                    }}
+                    className="flex gap-3 p-2 rounded-2xl hover:bg-white/5 transition-all group cursor-pointer border border-transparent hover:border-white/5"
+                  >
+                    <div className="relative w-40 aspect-video rounded-xl overflow-hidden shrink-0 bg-black">
+                      <img 
+                        src={`/api/thumbnail/${v.id}`} 
+                        alt={v.name} 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                        onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/320x180/111/fff?text=${encodeURIComponent(v.topic)}`}
+                      />
+                    </div>
+                    <div className="flex flex-col justify-center min-w-0 pr-2">
+                      <h4 className="text-xs font-bold text-white/90 line-clamp-2 leading-snug group-hover:text-blue-400 transition-colors mb-2">{v.name}</h4>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[9px] font-black text-blue-500/60 uppercase truncate">{v.topic}</span>
+                        <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
                       </div>
                     </div>
-                  ))}
-               </div>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <div className="relative w-full h-full group/miniContent">
-          <video 
-            ref={videoRef}
-            src={`/api/stream/${video.id}`} 
-            playsInline
-            autoPlay
-            className="w-full h-full object-cover"
-            style={{ playbackRate: playbackSpeed }}
-            onClick={onRestore}
-          />
-          
-          {/* Mini Controls Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40 opacity-0 group-hover/miniContent:opacity-100 transition-opacity flex flex-col justify-between p-3">
-             <div className="flex items-center justify-between">
-                <div className="flex flex-col min-w-0 pr-2">
-                   <span className="text-[10px] font-black text-white/90 truncate uppercase tracking-tighter leading-none">{video.name}</span>
-                   <span className="text-[8px] font-bold text-blue-500/80 uppercase mt-0.5">{video.topic}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                   <button 
-                     onClick={onRestore}
-                     className="p-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-                   >
-                     <Maximize2 size={14} />
-                   </button>
-                   <button 
-                     onClick={onClose}
-                     className="p-1.5 bg-white/10 hover:bg-red-500/20 rounded-lg text-red-500 transition-colors"
-                   >
-                     <X size={14} />
-                   </button>
-                </div>
-             </div>
-
-             <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => isPlaying ? videoRef.current?.pause() : videoRef.current?.play()}
-                  className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-white/20 rounded-full text-white backdrop-blur-md border border-white/10 transition-colors"
-                >
-                  {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="ml-0.5" />}
-                </button>
-                <div className="flex-1 h-1 bg-white/10 rounded-full overflow-hidden relative group/progress">
-                   <div 
-                     className="absolute inset-y-0 left-0 bg-blue-600 transition-all"
-                     style={{ width: `${(currentTime / duration) * 100}%` }}
-                   />
-                   <div 
-                     className="absolute inset-y-0 left-0 bg-white/20"
-                     style={{ width: `${networkStats.progress}%` }}
-                   />
-                </div>
+                  </div>
+                ))}
              </div>
           </div>
-
-          {/* Simple progress bar always visible when not hovered */}
-          <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/5 opacity-100 group-hover/miniContent:opacity-0 transition-opacity">
-             <div 
-               className="h-full bg-blue-600"
-               style={{ width: `${(currentTime / duration) * 100}%` }}
-             />
-          </div>
         </div>
-      )}
+      </div>
     </motion.div>
   );
 };
@@ -791,13 +714,7 @@ export default function App() {
   const [scanning, setScanning] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
-  const [activeVideo, setActiveVideo] = useState<VideoFile | null>(() => {
-    const saved = localStorage.getItem('mini_player_video');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [playerMode, setPlayerMode] = useState<'full' | 'mini' | 'hidden'>(() => {
-    return localStorage.getItem('mini_player_video') ? 'mini' : 'hidden';
-  });
+  const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -805,25 +722,20 @@ export default function App() {
     initApp();
 
     const handleSelectVideo = (e: any) => {
-      const video = e.detail;
-      if (activeVideo?.id === video.id) {
-        setPlayerMode('full');
-      } else {
-        setActiveVideo(video);
-        setPlayerMode('full');
-      }
+      setSelectedVideo(e.detail);
     };
     window.addEventListener('select-video', handleSelectVideo);
     return () => window.removeEventListener('select-video', handleSelectVideo);
-  }, [activeVideo]);
+  }, []);
 
-  useEffect(() => {
-    if (activeVideo) {
-      localStorage.setItem('mini_player_video', JSON.stringify(activeVideo));
-    } else {
-      localStorage.removeItem('mini_player_video');
-    }
-  }, [activeVideo]);
+  const mediaFilter = (name: string, topic: string) => {
+    const combined = (name + ' ' + topic).toLowerCase();
+    // Strict requirement: Only 2025 and 2024-2025
+    if (combined.includes('2024-2025')) return true;
+    if (combined.includes('2025')) return true;
+    // Hide 2023, 2024, and anything else not matching above strictly
+    return false;
+  };
 
   const initApp = async () => {
     setLoading(true);
@@ -858,8 +770,25 @@ export default function App() {
         fetch('/api/videos'),
         fetch('/api/topics')
       ]);
-      setVideos(await vRes.json());
-      setTopics(await tRes.json());
+      const rawVideos: VideoFile[] = await vRes.json();
+      
+      // Apply strict filtering
+      const filteredVideos = rawVideos.filter(v => mediaFilter(v.name, v.topic));
+      setVideos(filteredVideos);
+
+      // Re-calculate topics based on filtered videos
+      const topicMap = new Map<string, number>();
+      filteredVideos.forEach(v => {
+        topicMap.set(v.topic, (topicMap.get(v.topic) || 0) + 1);
+      });
+      
+      const filteredTopics: Topic[] = Array.from(topicMap.entries()).map(([name, count]) => ({
+        name,
+        count,
+        videos: filteredVideos.filter(v => v.topic === name)
+      })).sort((a, b) => b.count - a.count);
+
+      setTopics(filteredTopics);
     } catch (err) {
       console.error('Failed to load media', err);
     }
@@ -906,22 +835,20 @@ export default function App() {
   const recentVideos = videos.filter(v => v.type === 'video').slice(0, 8);
 
   const handleNext = () => {
-    if (!activeVideo) return;
-    const currentIndex = currentVideos.findIndex(v => v.id === activeVideo.id);
+    if (!selectedVideo) return;
+    const currentIndex = currentVideos.findIndex(v => v.id === selectedVideo.id);
     const nextVideo = currentVideos.find((v, i) => i > currentIndex && v.type === 'video');
     if (nextVideo) {
-      setActiveVideo(nextVideo);
-      setPlayerMode('full');
+      setSelectedVideo(nextVideo);
     }
   };
 
   const handlePrev = () => {
-    if (!activeVideo) return;
-    const currentIndex = currentVideos.findIndex(v => v.id === activeVideo.id);
+    if (!selectedVideo) return;
+    const currentIndex = currentVideos.findIndex(v => v.id === selectedVideo.id);
     const prevVideo = [...currentVideos].reverse().find((v, i) => (currentVideos.length - 1 - i) < currentIndex && v.type === 'video');
     if (prevVideo) {
-      setActiveVideo(prevVideo);
-      setPlayerMode('full');
+      setSelectedVideo(prevVideo);
     }
   };
 
@@ -1013,12 +940,7 @@ export default function App() {
                     key={v.id} 
                     video={v} 
                     onClick={() => {
-                      if (activeVideo?.id === v.id) {
-                        setPlayerMode('full');
-                      } else {
-                        setActiveVideo(v);
-                        setPlayerMode('full');
-                      }
+                      setSelectedVideo(v);
                     }} 
                     highlight={searchTerm} 
                   />
@@ -1060,12 +982,7 @@ export default function App() {
                   video={v} 
                   onClick={() => {
                     if (v.type === 'video') {
-                      if (activeVideo?.id === v.id) {
-                        setPlayerMode('full');
-                      } else {
-                        setActiveVideo(v);
-                        setPlayerMode('full');
-                      }
+                      setSelectedVideo(v);
                     } else {
                       window.open(`/api/pdf/${v.id}`, '_blank');
                     }
@@ -1080,20 +997,13 @@ export default function App() {
 
       {/* Floating Overlays */}
       <AnimatePresence>
-        {activeVideo && playerMode !== 'hidden' && (
+        {selectedVideo && (
           <VideoPlayerPage 
-            video={activeVideo} 
+            video={selectedVideo} 
             allVideos={videos}
-            mode={playerMode}
-            onBack={() => setPlayerMode('mini')} 
-            onClose={() => {
-              setActiveVideo(null);
-              setPlayerMode('hidden');
-            }}
-            onRestore={() => setPlayerMode('full')}
+            onBack={() => setSelectedVideo(null)} 
             onNext={handleNext} 
             onPrev={handlePrev} 
-            relatedPdfs={videos.filter(p => p.type === 'pdf' && p.topic === activeVideo.topic)}
           />
         )}
       </AnimatePresence>

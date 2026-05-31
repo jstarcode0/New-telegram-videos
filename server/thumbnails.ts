@@ -2,7 +2,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import path from 'path';
 
-const THUMB_DIR = process.env.THUMBNAIL_PATH || './thumbnails';
+const THUMB_DIR = path.resolve(process.env.THUMBNAIL_PATH || path.join(process.cwd(), 'thumbnails'));
 
 if (!fs.existsSync(THUMB_DIR)) {
   fs.mkdirSync(THUMB_DIR, { recursive: true });
