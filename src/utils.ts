@@ -6,17 +6,18 @@ export function cleanTitle(name: string): string {
   
   // Remove decorative lines/dashes
   cleaned = cleaned.replace(/[─━˗―]{3,}/g, '');
+  cleaned = cleaned.replace(/─────+/g, '');
   
   // Remove technical labels
   cleaned = cleaned.replace(/(VID ID|PDF ID)\s*\d+/gi, '');
-  cleaned = cleaned.replace(/🎥\s*ᴛɪᴛʟᴇ/gi, '');
-  cleaned = cleaned.replace(/📑\s*ᴛɪᴛʟᴇ/gi, '');
+  cleaned = cleaned.replace(/[🎥📑]?\s*ᴛɪᴛʟᴇ/gi, '');
   cleaned = cleaned.replace(/ᴛɪᴛʟᴇ/gi, '');
   
   // Remove credits and social handles
-  cleaned = cleaned.replace(/ᴇxᴛʀᴀᴄᴛᴇᴅ ʙʏ|@\w+/gi, '');
+  cleaned = cleaned.replace(/ᴇxᴛʀᴀᴄᴛᴇᴅ ʙʏ|Extracted By/gi, '');
+  cleaned = cleaned.replace(/@\w+/gi, '');
   
-  // Remove batch info specifically at the end
+  // Remove batch info specifically
   cleaned = cleaned.replace(/ʙᴀᴛᴄʜ\s+\w+/gi, '');
   
   // Remove resolution tags
@@ -38,7 +39,6 @@ export function cleanTitle(name: string): string {
   // If it ends with a dash, trim it
   cleaned = cleaned.replace(/[\s\-]+$/, '');
 
-  // Keep the ID at the start if it exists, e.g. "00666 - "
   return cleaned;
 }
 

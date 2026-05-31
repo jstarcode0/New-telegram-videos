@@ -27,51 +27,112 @@ const HighlightingText = ({ text, highlight }: { text: string, highlight: string
   );
 };
 
-const Navbar = ({ onSearch, onToggleSidebar, onOpenSettings, currentPath }: { onSearch: (q: string) => void, onToggleSidebar: () => void, onOpenSettings: () => void, currentPath?: string | null }) => (
-  <nav className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-6 z-50 shadow-2xl">
-    <div className="flex items-center gap-4">
-      <button onClick={onToggleSidebar} className="p-2 hover:bg-white/10 rounded-xl lg:hidden transition-colors">
-        <Menu size={24} className="text-white" />
-      </button>
-      <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.location.href = '/'}>
-        <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/20">
-          <Play size={20} fill="white" className="text-white ml-0.5" />
-        </div>
-        <div className="flex flex-col">
-           <h1 className="text-lg font-black text-white tracking-tighter leading-none">TELEGRAM</h1>
-           <span className="text-[10px] font-bold text-white/40 tracking-[0.2em] leading-none mt-0.5 uppercase">Video Archive</span>
-        </div>
-      </div>
-      {currentPath && (
-         <div className="hidden lg:flex items-center gap-2 ml-6 px-4 py-1.5 bg-white/5 rounded-full border border-white/10 max-w-xs transition-opacity hover:opacity-100 opacity-60">
-            <HardDrive size={14} className="text-blue-500 shrink-0" />
-            <span className="text-[10px] font-bold text-white uppercase truncate">
-              {currentPath.split('/').pop()}
-            </span>
-         </div>
-      )}
-    </div>
-    
-    <div className="flex-1 max-w-2xl mx-8 hidden sm:block">
-      <div className="relative group">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-500 transition-colors" size={18} />
-        <input 
-          type="text" 
-          placeholder="Quick search titles, topics..." 
-          className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all font-medium text-sm"
-          onChange={(e) => onSearch(e.target.value)}
-        />
-      </div>
-    </div>
+const Navbar = ({ 
+  onSearch, 
+  onToggleSidebar, 
+  onOpenSettings, 
+  currentPath,
+  isSearchOpen,
+  setIsSearchOpen,
+  searchValue,
+  setSearchValue
+}: { 
+  onSearch: (q: string) => void, 
+  onToggleSidebar: () => void, 
+  onOpenSettings: () => void, 
+  currentPath?: string | null,
+  isSearchOpen: boolean,
+  setIsSearchOpen: (val: boolean) => void,
+  searchValue: string,
+  setSearchValue: (val: string) => void
+}) => (
+  <nav className="fixed top-0 left-0 right-0 h-16 bg-black/80 backdrop-blur-xl border-b border-white/10 flex items-center justify-between px-4 md:px-6 z-50 shadow-2xl">
+    <AnimatePresence mode="wait">
+      {isSearchOpen ? (
+        <motion.div 
+          key="search-mode"
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          className="flex-1 flex items-center gap-3"
+        >
+          <button onClick={() => setIsSearchOpen(false)} className="p-2 hover:bg-white/10 rounded-xl transition-colors shrink-0">
+            <ChevronLeft size={24} className="text-white" />
+          </button>
+          <div className="flex-1 relative">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-500 transition-colors" size={18} />
+            <input 
+              autoFocus
+              type="text" 
+              placeholder="Search everything..." 
+              value={searchValue}
+              className="w-full bg-white/5 border border-white/10 rounded-2xl py-2 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all font-medium text-sm"
+              onChange={(e) => {
+                setSearchValue(e.target.value);
+                onSearch(e.target.value);
+              }}
+            />
+          </div>
+          <button onClick={() => { setSearchValue(''); onSearch(''); }} className="p-2 hover:bg-white/10 rounded-xl transition-colors shrink-0">
+            <X size={20} className="text-white/40" />
+          </button>
+        </motion.div>
+      ) : (
+        <motion.div 
+          key="nav-mode"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="flex-1 flex items-center justify-between w-full"
+        >
+          <div className="flex items-center gap-4">
+            <button onClick={onToggleSidebar} className="p-2 hover:bg-white/10 rounded-xl lg:hidden transition-colors">
+              <Menu size={24} className="text-white" />
+            </button>
+            <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.location.href = '/'}>
+              <div className="w-9 h-9 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/20">
+                <Play size={20} fill="white" className="text-white ml-0.5" />
+              </div>
+              <div className="flex flex-col">
+                 <h1 className="text-lg font-black text-white tracking-tighter leading-none">TELEGRAM</h1>
+                 <span className="text-[10px] font-bold text-white/40 tracking-[0.2em] leading-none mt-0.5 uppercase">Video Archive</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex-1 max-w-2xl mx-8 hidden lg:block">
+            <div className="relative group">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-blue-500 transition-colors" size={18} />
+              <input 
+                type="text" 
+                value={searchValue}
+                placeholder="Quick search titles, topics..." 
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-2.5 pl-12 pr-4 text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:bg-white/10 transition-all font-medium text-sm"
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  onSearch(e.target.value);
+                }}
+              />
+            </div>
+          </div>
 
-    <div className="flex items-center gap-2">
-       <button 
-        onClick={onOpenSettings}
-        className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-white transition-all hover:scale-105 active:scale-95 group"
-       >
-          <Settings size={20} className="group-hover:rotate-45 transition-transform" />
-       </button>
-    </div>
+          <div className="flex items-center gap-1 md:gap-2">
+            <button 
+              onClick={() => setIsSearchOpen(true)}
+              className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-white transition-all lg:hidden"
+             >
+                <Search size={20} />
+             </button>
+             <button 
+              onClick={onOpenSettings}
+              className="p-2.5 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 text-white transition-all hover:scale-105 active:scale-95 group"
+             >
+                <Settings size={20} className="group-hover:rotate-45 transition-transform" />
+             </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   </nav>
 );
 
@@ -250,6 +311,7 @@ const VideoPlayerPage = ({
   const [volume, setVolume] = useState(() => parseFloat(localStorage.getItem('pref_volume') || '1'));
   const [isLiked, setIsLiked] = useState(false);
   const [networkStats, setNetworkStats] = useState({ progress: 0 });
+  const [isPdfsExpanded, setIsPdfsExpanded] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -380,7 +442,8 @@ const VideoPlayerPage = ({
       })
       .filter(x => x.score > 10)
       .sort((a, b) => b.score - a.score)
-      .map(x => x.pdf);
+      .map(x => x.pdf)
+      .slice(0, 6);
   }, [allVideos, video.id, video.numericId, video.name, video.topic]);
 
   const handleShare = () => {
@@ -396,7 +459,7 @@ const VideoPlayerPage = ({
       exit={{ opacity: 0 }}
       className="fixed inset-0 bg-[#050505] z-[100] overflow-y-auto overflow-x-hidden selection:bg-blue-600/30 font-sans"
     >
-      <div className="w-full max-w-[1600px] mx-auto px-4 py-4 lg:py-8">
+      <div className="w-full max-w-[1600px] mx-auto px-4 py-4 lg:py-8 pb-32 lg:pb-8">
         <div className="flex items-center gap-4 mb-6">
           <button onClick={onBack} className="flex items-center gap-2 text-white/40 hover:text-white transition-all group px-3 py-1.5 bg-white/5 rounded-xl border border-white/5 shrink-0">
             <ChevronLeft size={16} className="group-hover:-translate-x-1 transition-transform" />
@@ -454,7 +517,7 @@ const VideoPlayerPage = ({
               </div>
 
               {/* Description & metadata box */}
-              <div className="p-6 bg-white/5 rounded-2xl border border-white/5 space-y-4">
+              <div className="p-6 bg-white/5 rounded-2xl border border-white/10 space-y-4">
                 <div className="flex flex-wrap gap-x-8 gap-y-4 text-xs font-bold text-white/60">
                    <div className="flex flex-col">
                       <span className="text-[9px] uppercase text-white/20 tracking-widest mb-1">Uploaded</span>
@@ -489,49 +552,109 @@ const VideoPlayerPage = ({
 
               {/* Related PDFs Section */}
               {relatedPdfs.length > 0 && (
-                <div className="pt-8">
-                  <h3 className="text-sm font-black text-white/20 uppercase tracking-[0.3em] mb-6 flex items-center gap-2">
-                    <FileText size={16} className="text-red-500" />
-                    Related PDFs
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {relatedPdfs.map(pdf => (
-                      <div key={pdf.id} className="flex items-center justify-between p-4 bg-white/2 rounded-2xl border border-white/5 group hover:bg-white/5 transition-all">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <div className="p-2.5 bg-red-500/10 text-red-500 rounded-xl">
-                            <FileText size={18} />
-                          </div>
-                          <div className="flex flex-col overflow-hidden">
-                             <span className="text-xs font-bold text-white/80 truncate">{cleanTitle(pdf.name)}</span>
-                             <span className="text-[9px] text-white/20 font-black">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
-                          </div>
+                <div className="pt-4 border-t border-white/5">
+                  <button 
+                    onClick={() => setIsPdfsExpanded(!isPdfsExpanded)}
+                    className="flex items-center justify-between w-full p-4 bg-white/5 hover:bg-white/10 rounded-2xl border border-white/10 transition-all group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <FileText size={18} className="text-blue-500" />
+                      <span className="text-sm font-black text-white uppercase tracking-wider">
+                        {isPdfsExpanded ? 'Hide PDFs ▲' : 'Show PDFs ▼'}
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-black text-white/20 uppercase tracking-widest">{relatedPdfs.length} FOUND</span>
+                  </button>
+
+                  <AnimatePresence>
+                    {isPdfsExpanded && (
+                      <motion.div 
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="pt-4 space-y-3 px-1">
+                          {relatedPdfs.map(pdf => (
+                            <div key={pdf.id} className="p-4 bg-white/2 rounded-2xl border border-white/5 flex flex-col gap-4">
+                              <div className="flex items-start gap-3">
+                                <FileText size={16} className="text-blue-500/60 mt-1 shrink-0" />
+                                <span className="text-sm font-medium text-white/90 leading-relaxed break-words">{cleanTitle(pdf.name)}</span>
+                              </div>
+                              <div className="flex items-center justify-between pt-3 border-t border-white/5">
+                                <span className="text-[10px] font-mono text-white/20 uppercase">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
+                                <div className="flex items-center gap-2">
+                                  <button 
+                                    onClick={() => window.open(`/api/pdf/${pdf.id}`, '_blank')}
+                                    className="px-4 py-1.5 bg-white/5 hover:bg-blue-600 rounded-xl text-[10px] font-black text-white/60 hover:text-white transition-all uppercase tracking-widest border border-white/5 cursor-pointer"
+                                  >
+                                    Open PDF
+                                  </button>
+                                  <a 
+                                    href={`/api/pdf/${pdf.id}`} 
+                                    download 
+                                    className="px-4 py-1.5 bg-white/5 hover:bg-blue-600 rounded-xl text-[10px] font-black text-white/60 hover:text-white transition-all uppercase tracking-widest border border-white/5"
+                                  >
+                                    Download
+                                  </a>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <button 
-                            onClick={() => window.open(`/api/pdf/${pdf.id}`, '_blank')}
-                            className="p-2.5 bg-white/5 hover:bg-blue-600 rounded-xl text-white/40 hover:text-white transition-all"
-                            title="View"
-                          >
-                            <Monitor size={16} />
-                          </button>
-                          <a 
-                            href={`/api/pdf/${pdf.id}`} 
-                            download 
-                            className="p-2.5 bg-white/5 hover:bg-blue-600 rounded-xl text-white/40 hover:text-white transition-all"
-                            title="Download"
-                          >
-                            <Download size={16} />
-                          </a>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                 </div>
               )}
             </div>
+
+            {/* Mobile/Desktop Conditional Related Videos for Flow */}
+            <div className="lg:hidden pt-8">
+               <div className="flex items-center justify-between mb-6 px-2">
+                  <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Related Videos</h3>
+                  <div className="flex gap-2">
+                     <button onClick={onPrev} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
+                        <SkipBack size={16} />
+                     </button>
+                     <button onClick={onNext} className="p-2 bg-white/5 hover:bg-white/10 rounded-lg text-white/40 hover:text-white transition-all">
+                        <SkipForward size={16} />
+                     </button>
+                  </div>
+               </div>
+               <div className="space-y-4">
+                  {relatedVideos.map(v => (
+                    <div 
+                      key={v.id} 
+                      onClick={() => {
+                          const event = new CustomEvent('select-video', { detail: v });
+                          window.dispatchEvent(event);
+                      }}
+                      className="flex gap-3 p-2 rounded-2xl hover:bg-white/5 transition-all group cursor-pointer border border-transparent hover:border-white/5"
+                    >
+                      <div className="relative w-32 sm:w-40 aspect-video rounded-xl overflow-hidden shrink-0 bg-black">
+                        <img 
+                          src={`/api/thumbnail/${v.id}`} 
+                          alt={v.name} 
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          onError={(e) => (e.target as HTMLImageElement).src = `https://placehold.co/320x180/111/fff?text=${encodeURIComponent(v.topic)}`}
+                        />
+                      </div>
+                      <div className="flex flex-col justify-center min-w-0 pr-2">
+                        <h4 className="text-sm font-bold text-white/90 leading-tight group-hover:text-blue-400 transition-colors mb-2 break-words overflow-hidden">{cleanTitle(v.name)}</h4>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[9px] font-black text-blue-500/60 uppercase truncate">{v.topic}</span>
+                          <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+               </div>
+            </div>
           </div>
 
-          <div className="lg:col-span-4 space-y-6">
+          {/* Desktop Right Sidebar */}
+          <div className="hidden lg:block lg:col-span-4 space-y-6">
              <div className="flex items-center justify-between px-2">
                 <h3 className="text-[10px] font-black text-white/20 uppercase tracking-[0.3em]">Related Videos</h3>
                 <div className="flex gap-2">
@@ -566,9 +689,7 @@ const VideoPlayerPage = ({
                       <h4 className="text-sm font-bold text-white/90 leading-tight group-hover:text-blue-400 transition-colors mb-2 break-words overflow-hidden">{cleanTitle(v.name)}</h4>
                       <div className="flex flex-col gap-1">
                         <span className="text-[9px] font-black text-blue-500/60 uppercase truncate">{v.topic}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
-                        </div>
+                        <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
                       </div>
                     </div>
                   </div>
@@ -744,6 +865,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTopic, setActiveTopic] = useState<string | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<VideoFile | null>(null);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
@@ -854,8 +976,10 @@ export default function App() {
 
   const currentVideos = useMemo(() => {
     return videos.filter(v => {
-      const matchesSearch = v.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                            v.topic.toLowerCase().includes(searchTerm.toLowerCase());
+      const s = searchTerm.toLowerCase();
+      const matchesSearch = v.name.toLowerCase().includes(s) || 
+                            v.topic.toLowerCase().includes(s) ||
+                            (v.type === 'pdf' && v.name.toLowerCase().includes(s));
       const matchesTopic = !activeTopic || v.topic === activeTopic;
       return matchesSearch && matchesTopic;
     });
@@ -944,6 +1068,10 @@ export default function App() {
         onToggleSidebar={() => setIsSidebarOpen(true)} 
         onOpenSettings={() => setIsSettingsOpen(true)}
         currentPath={config.mediaRoot}
+        isSearchOpen={isMobileSearchOpen}
+        setIsSearchOpen={setIsMobileSearchOpen}
+        searchValue={searchTerm}
+        setSearchValue={setSearchTerm}
       />
       
       <Sidebar 
