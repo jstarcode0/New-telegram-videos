@@ -47,6 +47,7 @@ export async function listFolders(parentPath: string): Promise<any[]> {
 
 export interface VideoFile {
   id: string;
+  numericId: number | null;
   name: string;
   path: string;
   ext: string;
@@ -128,8 +129,12 @@ export async function scanFiles(basePath: string): Promise<VideoFile[]> {
     // Capitalize properly
     topic = topic.charAt(0).toUpperCase() + topic.slice(1);
 
+    const numericIdMatch = fileName.match(/^(\d+)/);
+    const numericId = numericIdMatch ? parseInt(numericIdMatch[1], 10) : null;
+
     return {
       id: generateId(entry.path),
+      numericId,
       name: fileNameNoExt,
       path: entry.path,
       ext,

@@ -1,5 +1,6 @@
 export interface VideoFile {
   id: string;
+  numericId: number | null;
   name: string;
   path: string;
   ext: string;

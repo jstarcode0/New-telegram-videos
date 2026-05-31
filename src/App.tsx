@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { VideoFile, Topic, FolderInfo, AppConfig } from './types.ts';
+import { cleanTitle, extractNumericId } from './utils.ts';
 
 // --- Components ---
 
@@ -217,7 +218,7 @@ const VideoCard: React.FC<{ video: VideoFile; onClick: () => void; highlight: st
     </div>
     <div className="p-4 md:p-6 min-w-0">
       <h4 className="text-white font-bold text-xs md:text-sm line-clamp-2 leading-relaxed min-h-[2.4rem] md:min-h-[2.8rem] group-hover:text-blue-400 transition-colors break-words overflow-hidden">
-        <HighlightingText text={video.name} highlight={highlight} />
+        <HighlightingText text={cleanTitle(video.name)} highlight={highlight} />
       </h4>
       <div className="flex items-center justify-between mt-4 border-t border-white/5 pt-4">
         <div className="flex items-center gap-2">
@@ -320,41 +321,67 @@ const VideoPlayerPage = ({
   }, []);
 
   const relatedVideos = useMemo(() => {
-    return allVideos
-      .filter(v => v.type === 'video' && v.id !== video.id)
+    const currentId = video.numericId;
+    if (currentId === null) {
+      return allVideos
+        .filter(v => v.type === 'video' && v.id !== video.id)
+        .sort((a, b) => (a.topic === video.topic ? -1 : 1))
+        .slice(0, 20);
+    }
+
+    const others = allVideos.filter(v => v.type === 'video' && v.id !== video.id);
+    
+    return others
       .map(v => {
-        let score = 0;
-        if (v.topic === video.topic) score += 10;
+        const otherId = v.numericId;
+        if (otherId === null) return { video: v, diff: Infinity, sortKey: 20000 };
         
-        const p1 = video.name.split(/[-_\s]/)[0].toLowerCase();
-        const p2 = v.name.split(/[-_\s]/)[0].toLowerCase();
-        if (p1 === p2 && p1.length > 2) score += 5;
+        const diff = otherId - currentId;
+        let sortKey = 0;
+        if (diff > 0) {
+          sortKey = diff; // 1, 2, 3...
+        } else {
+          sortKey = Math.abs(diff) + 10000; // 10001, 10002...
+        }
         
-        return { video: v, score };
+        return { video: v, diff, sortKey };
       })
-      .sort((a, b) => b.score - a.score)
+      .sort((a, b) => a.sortKey - b.sortKey)
       .map(x => x.video)
-      .slice(0, 15);
-  }, [allVideos, video.id, video.name, video.topic]);
+      .slice(0, 30);
+  }, [allVideos, video.id, video.numericId, video.topic]);
 
   const relatedPdfs = useMemo(() => {
+    const currentId = video.numericId;
+    const videoWords = cleanTitle(video.name).toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
+
     return allVideos
       .filter(v => v.type === 'pdf')
       .map(p => {
         let score = 0;
-        if (p.topic === video.topic) score += 10;
+        const pdfId = p.numericId;
         
-        const vWords = video.name.toLowerCase().split(/[-_\s]/).filter(w => w.length > 2);
-        const pWords = p.name.toLowerCase().split(/[-_\s]/).filter(w => w.length > 2);
-        const common = vWords.filter(w => pWords.includes(w));
-        score += common.length * 5;
+        // Match by ID proximity
+        if (currentId !== null && pdfId !== null) {
+          const diff = Math.abs(pdfId - currentId);
+          if (diff === 0) score += 100;
+          else if (diff <= 10) score += (60 - diff * 5);
+        }
+
+        // Match by topic
+        if (p.topic === video.topic) score += 30;
+
+        // Match by keywords
+        const pdfWords = cleanTitle(p.name).toLowerCase().split(/[\s-]+/).filter(w => w.length > 2);
+        const common = videoWords.filter(w => pdfWords.includes(w));
+        score += common.length * 15;
 
         return { pdf: p, score };
       })
-      .filter(x => x.score > 0)
+      .filter(x => x.score > 10)
       .sort((a, b) => b.score - a.score)
       .map(x => x.pdf);
-  }, [allVideos, video.name, video.topic]);
+  }, [allVideos, video.id, video.numericId, video.name, video.topic]);
 
   const handleShare = () => {
     navigator.share?.({ title: video.name, url: window.location.href }).catch(() => {
@@ -398,7 +425,7 @@ const VideoPlayerPage = ({
             </div>
 
             <div className="space-y-4">
-              <h1 className="text-xl md:text-2xl font-black text-white leading-tight break-words">{video.name}</h1>
+              <h1 className="text-xl md:text-2xl font-black text-white leading-tight break-words">{cleanTitle(video.name)}</h1>
               
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 py-2 border-b border-white/5 pb-6">
                 <div className="flex items-center gap-3">
@@ -475,7 +502,7 @@ const VideoPlayerPage = ({
                             <FileText size={18} />
                           </div>
                           <div className="flex flex-col overflow-hidden">
-                             <span className="text-xs font-bold text-white/80 truncate">{pdf.name}</span>
+                             <span className="text-xs font-bold text-white/80 truncate">{cleanTitle(pdf.name)}</span>
                              <span className="text-[9px] text-white/20 font-black">{(pdf.size / (1024 * 1024)).toFixed(1)} MB</span>
                           </div>
                         </div>
@@ -536,10 +563,12 @@ const VideoPlayerPage = ({
                       />
                     </div>
                     <div className="flex flex-col justify-center min-w-0 pr-2">
-                      <h4 className="text-xs font-bold text-white/90 line-clamp-2 leading-snug group-hover:text-blue-400 transition-colors mb-2">{v.name}</h4>
+                      <h4 className="text-sm font-bold text-white/90 leading-tight group-hover:text-blue-400 transition-colors mb-2 break-words overflow-hidden">{cleanTitle(v.name)}</h4>
                       <div className="flex flex-col gap-1">
                         <span className="text-[9px] font-black text-blue-500/60 uppercase truncate">{v.topic}</span>
-                        <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-mono text-white/20 uppercase">{(v.size / (1024 * 1024)).toFixed(0)} MB</span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -836,6 +865,20 @@ export default function App() {
 
   const handleNext = () => {
     if (!selectedVideo) return;
+    
+    // Use numeric ID based navigation if available
+    if (selectedVideo.numericId !== null) {
+      const sortedVideos = [...videos].filter(v => v.type === 'video' && v.numericId !== null)
+        .sort((a, b) => (a.numericId || 0) - (b.numericId || 0));
+      
+      const currentIndex = sortedVideos.findIndex(v => v.id === selectedVideo.id);
+      if (currentIndex !== -1 && currentIndex < sortedVideos.length - 1) {
+        setSelectedVideo(sortedVideos[currentIndex + 1]);
+        return;
+      }
+    }
+
+    // Fallback to library order
     const currentIndex = currentVideos.findIndex(v => v.id === selectedVideo.id);
     const nextVideo = currentVideos.find((v, i) => i > currentIndex && v.type === 'video');
     if (nextVideo) {
@@ -845,6 +888,19 @@ export default function App() {
 
   const handlePrev = () => {
     if (!selectedVideo) return;
+
+    // Use numeric ID based navigation if available
+    if (selectedVideo.numericId !== null) {
+      const sortedVideos = [...videos].filter(v => v.type === 'video' && v.numericId !== null)
+        .sort((a, b) => (a.numericId || 0) - (b.numericId || 0));
+      
+      const currentIndex = sortedVideos.findIndex(v => v.id === selectedVideo.id);
+      if (currentIndex > 0) {
+        setSelectedVideo(sortedVideos[currentIndex - 1]);
+        return;
+      }
+    }
+
     const currentIndex = currentVideos.findIndex(v => v.id === selectedVideo.id);
     const prevVideo = [...currentVideos].reverse().find((v, i) => (currentVideos.length - 1 - i) < currentIndex && v.type === 'video');
     if (prevVideo) {
